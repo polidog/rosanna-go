@@ -1,16 +1,18 @@
 # rosanna-go
 
-[polidog/rosanna](https://github.com/polidog/rosanna) の Go 版です。HTML を React の要素の形で Go から書きます。
-PHP 版の PSX にあたるものは **GSX** で、Go のファイルの中に HTML のようにタグを書けます。
-Rosanna と GSX の関係は React と JSX の関係と同じで、GSX は省いても構いません。
+[日本語](README.ja.md)
 
-描画は値を受け取って文字列を返すだけです。ルーターも DI も持たず、HTTP のことも知りません。
+The Go port of [polidog/rosanna](https://github.com/polidog/rosanna). It lets you write HTML from Go in the shape of React elements.
+The Go counterpart of PHP's PSX is **GSX**, which lets you write tags like HTML inside a Go file.
+Rosanna relates to GSX the way React relates to JSX: GSX is optional.
+
+Rendering takes values and returns a string. Rosanna has no router and no DI, and it knows nothing about HTTP.
 
 ```bash
 go get github.com/polidog/rosanna-go
 ```
 
-## El で書く
+## Writing with El
 
 ```go
 import "github.com/polidog/rosanna-go"
@@ -24,16 +26,16 @@ page := rosanna.El("main", nil,
 html, err := rosanna.Render(page)
 ```
 
-- 子には `*Element`、`string`、数値、`fmt.Stringer`、`Renderable`、`nil`、`bool` と、それらのスライスを渡せます。`nil` と `bool` は何も出力しません。それ以外はエラーです。
-- テキストと属性の値はエスケープします (PHP の `htmlspecialchars(ENT_QUOTES | ENT_SUBSTITUTE)` と同じ)。
-- 属性名は JSX の名前 (`className`、`htmlFor`、`tabIndex`、`strokeWidth` …) も使えます。
-- `on*` 属性、値のある `srcdoc` はエラーです。`href` や `src` の `javascript:`、`vbscript:`、`data:` は属性だけを落とします。
-- `select` の `value` は出力せず、一致する `option` に `selected` を付けます。`multiple` ならスライスを渡します。
-- `script` と `style` の中身はエスケープしません。中に `</script` などがあるとエラーです。
+- Children can be `*Element`, `string`, numbers, `fmt.Stringer`, `Renderable`, `nil`, `bool`, and slices of those. `nil` and `bool` output nothing. Anything else is an error.
+- Text and attribute values are escaped (the same as PHP's `htmlspecialchars(ENT_QUOTES | ENT_SUBSTITUTE)`).
+- Attribute names can also be JSX names (`className`, `htmlFor`, `tabIndex`, `strokeWidth`, ...).
+- `on*` attributes and a non-empty `srcdoc` are errors. A `javascript:`, `vbscript:` or `data:` URL in `href`, `src` and similar attributes drops just that attribute.
+- A `select`'s `value` is not output. Instead, the matching `option` is marked `selected`. With `multiple`, pass a slice.
+- The content of `script` and `style` is not escaped. It is an error if it contains `</script` or the like.
 
 ## GSX
 
-`.gsx` は、タグを書ける Go のファイルです。
+A `.gsx` file is a Go file in which you can write tags.
 
 ```go
 // components/songs.gsx
@@ -55,7 +57,7 @@ func SongList(p SongListProps) rosanna.Node {
 					return <li>{song}</li>
 				})}
 			</ul>
-			{rosanna.If(len(p.Songs) == 0, <p>曲がありません</p>)}
+			{rosanna.If(len(p.Songs) == 0, <p>No songs</p>)}
 		</section>
 	)
 }
@@ -65,9 +67,9 @@ func Page(title string, songs []string) rosanna.Node {
 }
 ```
 
-### コンポーネントと props
+### Components and props
 
-コンポーネントは、`<名前>Props` の struct を 1 つ受け取って `rosanna.Node` を返す関数です。タグはその関数の呼び出しになります。
+A component is a function that takes one `<Name>Props` struct and returns a `rosanna.Node`. A tag becomes a call to that function.
 
 ```go
 <SongList title={title} songs={songs} />   // SongList(SongListProps{Title: title, Songs: songs})
@@ -75,74 +77,76 @@ func Page(title string, songs []string) rosanna.Node {
 <Header />                                 // Header(HeaderProps{})
 ```
 
-- 属性名は先頭の 1 文字だけを大文字にしてフィールド名にします (`title` → `Title`)。残りは書いたとおりなので、`ID` のようなフィールドは `<User ID={id} />` と書きます。`data-id` のように Go の識別子にならない名前はコンパイルエラーです。
-- 子は `Children` フィールドに入ります。子が 1 つならその値、複数なら `[]rosanna.Node` です。`Children rosanna.Node` と宣言しておけばどちらも受けられます。
-- 属性のない `<Header />` も `HeaderProps{}` を渡すので、props のないコンポーネントにも空の `type HeaderProps struct{}` を用意します。
-- フィールド名の誤りや型の不一致は Go のコンパイラが見つけ、`.gsx` の行で報告します。
+- An attribute name becomes a field name by upper-casing its first letter only (`title` → `Title`). The rest is kept as written, so a field like `ID` is written `<User ID={id} />`. A name that is not a Go identifier, such as `data-id`, is a compile error.
+- Children go into the `Children` field: the value itself for a single child, a `[]rosanna.Node` for several. Declare `Children rosanna.Node` to accept both.
+- `<Header />` with no attributes still passes `HeaderProps{}`, so a component without props needs an empty `type HeaderProps struct{}`.
+- The Go compiler catches misspelled fields and mismatched types, and reports them at the `.gsx` line.
 
 ```
 components/songs.gsx:68: unknown field Colour in struct literal of type SongListProps
 ```
 
+### Compiling
+
 ```bash
 go run github.com/polidog/rosanna-go/cmd/gsx generate [--check] [--watch] [paths...]
 ```
 
-`foo.gsx` の隣に `foo_gsx.go` を書きます (`foo_test.gsx` は `foo_gsx_test.go`)。`go:generate` から呼ぶのが手軽です。
+It writes `foo_gsx.go` next to `foo.gsx` (`foo_test.gsx` becomes `foo_gsx_test.go`). Running it from `go:generate` is the easiest way.
 
 ```go
 //go:generate go run github.com/polidog/rosanna-go/cmd/gsx generate .
 ```
 
-| オプション | 意味 |
+| Option | Meaning |
 |---|---|
-| `--check` | 何も書かず、古い生成ファイルか、ソースのない生成ファイルがあれば exit 1。CI 向け |
-| `--watch` | 500ms ごとに `.gsx` を確かめて再生成する。失敗しても終了しない |
+| `--check` | Write nothing, and exit 1 if a generated file is stale or has no source. For CI |
+| `--watch` | Check `.gsx` files every 500ms and regenerate. Keeps running after a failure |
 
-- パスを省略するとカレントディレクトリを対象にします。ディレクトリは再帰的に走査し、`.`・`_` で始まるディレクトリ、`vendor`、`testdata` は飛ばします。
-- `.gsx` がなくなった生成ファイルは消します (先頭が gsx のヘッダーのものだけ)。
-- 生成コードの行は `.gsx` の行と一致し、`//line` 指令を付けます。**Go のコンパイルエラー、panic のスタックトレースは `.gsx` の行を指します。**
+- Without paths, the current directory is used. Directories are walked recursively, skipping directories that start with `.` or `_`, `vendor` and `testdata`.
+- A generated file whose `.gsx` is gone is removed (only files that start with the gsx header).
+- The lines of the generated code match the lines of the `.gsx`, and a `//line` directive is added. **Go compile errors and panic stack traces point at the `.gsx` lines.**
 
-### PSX との違い
+### Differences from PSX
 
 | | PSX (PHP) | GSX (Go) |
 |---|---|---|
-| コンポーネント | ファイルが `return` するクロージャ | `func(XxxProps) rosanna.Node` の関数。ファイルにいくつ書いてもよい |
-| props | `array $props` | `XxxProps` の struct。フィールドと型は Go のコンパイラが検査する |
-| 描画のタイミング | 描画のときに呼ぶ | タグを評価したときに呼ぶ (普通の関数呼び出し) |
-| 名前の解決 | コンパイラの manifest | Go のコンパイラ。manifest はない |
-| パッケージをまたぐ | `use` で名前を付ける | `<ui.Button />` と書ける |
-| `{$a && <b/>}` | コンパイラが書き換える | 書けない。`{rosanna.If(a, <b/>)}` |
+| Component | A closure the file `return`s | A `func(XxxProps) rosanna.Node`. A file can hold any number of them |
+| Props | `array $props` | An `XxxProps` struct. The Go compiler checks fields and types |
+| When it is called | At render time | When the tag is evaluated (a plain function call) |
+| Name resolution | The compiler's manifest | The Go compiler. There is no manifest |
+| Across packages | Name it with `use` | Write `<ui.Button />` |
+| `{$a && <b/>}` | Rewritten by the compiler | Not supported. Use `{rosanna.If(a, <b/>)}` |
 | `array_map` | `{array_map(fn ($x) => <li/>, $xs)}` | `{rosanna.Map(xs, func(x T) rosanna.Node { return <li/> })}` |
-| 生成物の場所 | `var/cache/psx` | ソースの隣 (`_gsx.go`) |
+| Output location | `var/cache/psx` | Next to the source (`_gsx.go`) |
 
-### 構文
+### Syntax
 
-構文は PSX と同じです。
+The syntax is the same as PSX.
 
-| 書き方 | 意味 |
+| Form | Meaning |
 |---|---|
-| `<div>...</div>`、`<my-tag />` | 組み込みタグ。先頭が大文字でないもの |
-| `<Counter />`、`<ui.Button />` | コンポーネント。名前 (ドットの後) の先頭が大文字のもの |
+| `<div>...</div>`, `<my-tag />` | A built-in tag. The name does not start with an upper-case letter |
+| `<Counter />`, `<ui.Button />` | A component. The name (after the dot) starts with an upper-case letter |
 | `<>...</>` | Fragment |
-| `a="..."`、`a='...'` | 文字列。`\` に続く引用符と `\` だけを解除し、その後でエンティティをデコードする |
-| `a={式}` | Go の式 1 つ。中にタグも書ける |
+| `a="..."`, `a='...'` | A string. Only `\` followed by the quote or `\` is unescaped, then entities are decoded |
+| `a={expr}` | A single Go expression. It can contain tags |
 | `a` | `true` |
-| `{式}` | 子。`{...xs}` も書ける (スライスは描画のときに平らにする) |
-| `{/* コメント */}` | 子を作らない |
+| `{expr}` | A child. `{...xs}` also works (slices are flattened at render time) |
+| `{/* comment */}` | Makes no child |
 
-- タグを書けるのは、Go が式を期待している位置だけです (`return`、`=`、`:=`、`(`、`,`、`[`、`{`、`:` の後)。`a < b`、`<-ch`、文字列とコメントの中の `<` は Go のままです。
-- `return` の後で改行すると Go が `;` を入れるので、複数行のタグは `return (` の後に書きます。閉じの `)` は次の行に書いて構いません。
-- テキストの空白、エンティティ、`style` と `script`、`for` → `htmlFor`、同名の属性は後が勝つ、は PSX と同じです。
-- 属性のスプレッド (`<div {...a} />`) と名前空間付きの属性名 (`xlink:href`) はコンパイルエラーです。
-- `{}` の末尾に `//` コメントは書けません (`/* */` を使います)。
+- Tags can only be written where Go expects an expression (after `return`, `=`, `:=`, `(`, `,`, `[`, `{`, `:`). `a < b`, `<-ch`, and `<` inside strings and comments stay Go.
+- Go inserts `;` at a line break after `return`, so write a multi-line tag after `return (`. The closing `)` may go on the next line.
+- Text whitespace, entities, `style` and `script`, `for` → `htmlFor`, and "the last attribute with the same name wins" work as in PSX.
+- Attribute spread (`<div {...a} />`) and namespaced attribute names (`xlink:href`) are compile errors.
+- A `{}` cannot end with a `//` comment (use `/* */`).
 
-## まだないもの
+## Not yet available
 
-- 状態 (`fc()`、`useState`、`onClick`) と `<defer>`。PHP 版の `rosanna-state`、`rosanna-defer` にあたるもの
-- エディタ (gopls) の `.gsx` 対応
-- 生成ファイルは `gofmt` していません (行を揃えるため)。`gofmt -l` に出ます
+- State (`fc()`, `useState`, `onClick`) and `<defer>`, the counterparts of PHP's `rosanna-state` and `rosanna-defer`
+- `.gsx` support in editors (gopls)
+- Generated files are not `gofmt`ed (to keep lines aligned), so they show up in `gofmt -l`
 
-## ライセンス
+## License
 
 MIT
